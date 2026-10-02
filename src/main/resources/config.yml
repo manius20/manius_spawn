@@ -1,0 +1,16 @@
+# Ustawienia czasowe (w sekundach)
+teleport-delay: 5
+cooldown-time: 25
+
+# Wiadomości tekstowe
+messages:
+  no-permission: "&cBrak uprawnień do tej komendy!"
+  spawn-set: "&aPomyślnie ustawiono punkt spawnu!"
+  no-spawn-set: "&cSpawn nie został jeszcze ustawiony przez administrację!"
+  cooldown-active: "&cMusisz odczekać jeszcze {time}s przed ponownym użyciem tej komendy!"
+  teleport-success: "&aPrzeteleportowano na spawn!"
+  only-players: "Ta komenda jest dostępna tylko dla graczy!"
+
+# Ustawienia napisów na środku ekranu (Title)
+title:
+  subtitle: "&eSekund do teleportacji"
