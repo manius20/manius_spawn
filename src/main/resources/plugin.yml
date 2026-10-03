@@ -1,10 +1,8 @@
-name: CustomSpawn
+name: SpawnPlugin
 version: 1.0
-main: com.example.customspawn.CustomSpawn
+main: pl.manius.spawnplugin.SpawnPlugin
 api-version: '1.21'
 commands:
-  setspawn:
-    description: Ustawia miejsce spawnu
-    permission: customspawn.setspawn
   spawn:
-    description: Teleportuje na spawn po ustawionym czasie
+    description: Teleportuje gracza na spawn po 10 sekundach
+    usage: /spawn
