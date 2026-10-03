@@ -1,160 +1,129 @@
-package com.example.customspawn;
+package pl.manius.spawnplugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
-import java.time.Duration;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
-public final class CustomSpawn extends JavaPlugin implements Listener, CommandExecutor {
+public final class SpawnPlugin extends JavaPlugin implements CommandExecutor, Listener {
 
-    private final Map<UUID, Long> cooldowns = new HashMap<>();
+    // Przechowuje aktywne zadania teleportacji oraz liczniki czasu dla graczy
+    private final HashMap<UUID, BukkitTask> teleportTasks = new HashMap<>();
+    private final HashMap<UUID, Location> startLocations = new HashMap<>();
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+        // Rejestracja komendy /spawn oraz nasłuchiwacza ruchu
+        getCommand("spawn").setExecutor(this);
         getServer().getPluginManager().registerEvents(this, this);
-        if (getCommand("setspawn") != null) getCommand("setspawn").setExecutor(this);
-        if (getCommand("spawn") != null) getCommand("spawn").setExecutor(this);
+        getLogger().info("Plugin SpawnPlugin (10 sekund + anty-ruch) został pomyślnie włączony!");
     }
 
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        if (!player.hasPlayedBefore()) {
-            Location spawnLoc = getSpawnLocation();
-            if (spawnLoc != null) {
-                player.teleport(spawnLoc);
-            }
-        }
+    @Override
+    public void onDisable() {
+        teleportTasks.clear();
+        startLocations.clear();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(getMessage("messages.only-players"));
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("Tę komendę może wykonać tylko gracz!");
             return true;
         }
 
-        if (command.getName().equalsIgnoreCase("setspawn")) {
-            if (!player.hasPermission("customspawn.setspawn")) {
-                player.sendMessage(getMessage("messages.no-permission"));
-                return true;
-            }
-            saveSpawnLocation(player.getLocation());
-            player.sendMessage(getMessage("messages.spawn-set"));
+        Player player = (Player) sender;
+        UUID uuid = player.getUniqueId();
+
+        // Jeśli gracz już jest w trakcie teleportacji
+        if (teleportTasks.containsKey(uuid)) {
+            player.sendMessage(ChatColor.RED + "Masz już aktywną próbę teleportacji! Nie ruszaj się.");
             return true;
         }
 
-        if (command.getName().equalsIgnoreCase("spawn")) {
-            Location spawnLoc = getSpawnLocation();
-            if (spawnLoc == null) {
-                player.sendMessage(getMessage("messages.no-spawn-set"));
-                return true;
-            }
+        player.sendMessage(ChatColor.YELLOW + "Teleportacja nastąpi za " + ChatColor.GOLD + "10 sekund" + ChatColor.YELLOW + ". Nie ruszaj się!");
 
-            int cooldownSec = getConfig().getInt("cooldown-time", 25);
-            long currentTime = System.currentTimeMillis();
+        // Zapisujemy pozycję początkową gracza
+        startLocations.put(uuid, player.getLocation().clone());
 
-            if (cooldowns.containsKey(player.getUniqueId())) {
-                long lastUse = cooldowns.get(player.getUniqueId());
-                long timeLeft = (lastUse + (cooldownSec * 1000L) - currentTime) / 1000;
-                if (timeLeft > 0) {
-                    String msg = getConfig().getString("messages.cooldown-active", "&cOdczekaj {time}s!")
-                            .replace("{time}", String.valueOf(timeLeft));
-                    player.sendMessage(parseColor(msg));
-                    return true;
-                }
-            }
+        // Uruchamiamy zadanie cykliczne (co 1 sekundę = 20 ticków), które odlicza czas od 10 do 0
+        final int[] secondsLeft = {10};
 
-            startTeleportCountdown(player, spawnLoc);
-            return true;
-        }
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (secondsLeft[0] > 0) {
+                // Wyświetlamy informację co sekundę (możesz zmienić na pasek akcji lub zostawić na czacie)
+                player.sendMessage(ChatColor.GRAY + "Teleportacja za: " + ChatColor.YELLOW + secondsLeft[0] + "s...");
+                secondsLeft[0]--;
+            } else {
+                // Minęło 10 sekund - wykonujemy teleportację!
+                
+                // === TUTAJ USTAW WSPÓŁRZĘDNE SWOJEGO SPAWNU ===
+                World world = Bukkit.getWorld("world"); // nazwa świata (zazwyczaj "world")
+                double x = 0.5;   // koordynat X
+                double y = 100.0; // koordynat Y (wysokość)
+                double z = 0.5;   // koordynat Z
+                float yaw = 0.0f;   // obrót poziomy (patrzenie w lewo/prawo)
+                float pitch = 0.0f; // obrót pionowy (góra/dół)
 
-        return false;
-    }
-
-    private void startTeleportCountdown(Player player, Location targetLoc) {
-        int delay = getConfig().getInt("teleport-delay", 5);
-
-        new BukkitRunnable() {
-            int secondsLeft = delay;
-
-            @Override
-            public void run() {
-                if (!player.isOnline()) {
-                    cancel();
-                    return;
-                }
-
-                if (secondsLeft > 0) {
-                    String subMsg = getConfig().getString("title.subtitle", "&eSekund do teleportacji");
-                    Title title = Title.title(
-                            parseColor("&6" + secondsLeft),
-                            parseColor(subMsg),
-                            Title.Times.times(Duration.ZERO, Duration.ofMillis(1100), Duration.ZERO)
-                    );
-                    player.showTitle(title);
-                    secondsLeft--;
+                if (world != null) {
+                    Location spawnLocation = new Location(world, x, y, z, yaw, pitch);
+                    player.teleport(spawnLocation);
+                    player.sendMessage(ChatColor.GREEN + "Zostałeś pomyślnie przeteleportowany na spawn!");
                 } else {
-                    player.teleport(targetLoc);
-                    player.sendMessage(getMessage("messages.teleport-success"));
-                    cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
-                    cancel();
+                    player.sendMessage(ChatColor.RED + "Błąd: Nie znaleziono świata docelowego!");
+                }
+
+                // Czyszczymy dane gracza po zakończeniu
+                cancelTeleport(uuid);
+            }
+        }, 0L, 20L); // Start natychmiast (0L), powtarzaj co sekundę (20L)
+
+        teleportTasks.put(uuid, task);
+        return true;
+    }
+
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+
+        // Sprawdzamy, czy gracz ma włączoną teleportację
+        if (teleportTasks.containsKey(uuid)) {
+            Location startLoc = startLocations.get(uuid);
+            Location currentLoc = event.getTo();
+
+            if (startLoc != null && currentLoc != null) {
+                // Sprawdzamy, czy gracz zmienił blok (X, Y lub Z). Obracanie głowy (Yaw/Pitch) jest ignorowane.
+                if (startLoc.getBlockX() != currentLoc.getBlockX() ||
+                    startLoc.getBlockY() != currentLoc.getBlockY() ||
+                    startLoc.getBlockZ() != currentLoc.getBlockZ()) {
+
+                    // Przerywamy teleportację
+                    cancelTeleport(uuid);
+                    player.sendMessage(ChatColor.RED + "Ruszyłeś się! Teleportacja została przerwana.");
                 }
             }
-        }.runTaskTimer(this, 0L, 20L);
+        }
     }
 
-    private Component getMessage(String path) {
-        String msg = getConfig().getString(path, "");
-        return parseColor(msg);
-    }
-
-    private Component parseColor(String text) {
-        return LegacyComponentSerializer.legacyAmpersand().deserialize(text);
-    }
-
-    private void saveSpawnLocation(Location loc) {
-        FileConfiguration config = getConfig();
-        config.set("spawn.world", loc.getWorld().getName());
-        config.set("spawn.x", loc.getX());
-        config.set("spawn.y", loc.getY());
-        config.set("spawn.z", loc.getZ());
-        config.set("spawn.yaw", loc.getYaw());
-        config.set("spawn.pitch", loc.getPitch());
-        saveConfig();
-    }
-
-    private Location getSpawnLocation() {
-        FileConfiguration config = getConfig();
-        if (!config.contains("spawn.world")) return null;
-
-        String worldName = config.getString("spawn.world");
-        if (worldName == null || Bukkit.getWorld(worldName) == null) return null;
-
-        return new Location(
-                Bukkit.getWorld(worldName),
-                config.getDouble("spawn.x"),
-                config.getDouble("spawn.y"),
-                config.getDouble("spawn.z"),
-                (float) config.getDouble("spawn.yaw"),
-                (float) config.getDouble("spawn.pitch")
-        );
+    // Pomocnicza metoda do bezpiecznego czyszczenia zadań
+    private void cancelTeleport(UUID uuid) {
+        if (teleportTasks.containsKey(uuid)) {
+            teleportTasks.get(uuid).cancel();
+            teleportTasks.remove(uuid);
+        }
+        startLocations.remove(uuid);
     }
 }
