@@ -103,18 +103,37 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
             }
 
             int delay = config.getInt("teleport-delay", 10);
-            String startMsg = config.getString("messages.teleport-start")
-                    .replace("%time%", String.valueOf(delay));
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', startMsg));
-
             initialLocations.put(player.getUniqueId(), player.getLocation().clone());
 
-            BukkitTask task = Bukkit.getScheduler().runTaskLater(this, () -> {
-                teleportTasks.remove(player.getUniqueId());
-                initialLocations.remove(player.getUniqueId());
-                player.teleport(spawn);
-                player.sendMessage(ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-success")));
-            }, delay * 20L);
+            // Zadanie uruchamiane co sekundę, aby aktualizować tytuł na ekranie
+            BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
+                int timeLeft = delay;
+
+                @Override
+                public void run() {
+                    if (timeLeft <= 0) {
+                        teleportTasks.remove(player.getUniqueId());
+                        initialLocations.remove(player.getUniqueId());
+                        player.teleport(spawn);
+                        player.sendTitle(
+                                ChatColor.GREEN + "Teleportowano!",
+                                ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-success")),
+                                0, 40, 10
+                        );
+                        player.sendMessage(ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-success")));
+                        BukkitTask currentTask = teleportTasks.get(player.getUniqueId());
+                        if (currentTask != null) currentTask.cancel();
+                        return;
+                    }
+
+                    player.sendTitle(
+                            ChatColor.YELLOW + "Teleportacja za: " + timeLeft + "s",
+                            ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-start").replace("%time%", String.valueOf(timeLeft))),
+                            0, 25, 0
+                    );
+                    timeLeft--;
+                }
+            }, 0L, 20L);
 
             teleportTasks.put(player.getUniqueId(), task);
             return true;
@@ -144,15 +163,24 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
             teleportTasks.remove(uuid);
             initialLocations.remove(uuid);
 
-            String cancelMsg = getConfig().getString("messages.teleport-cancelled");
+            String cancelMsg = configOrDefault("messages.teleport-cancelled", "&cTeleportacja przerwana!");
+            player.sendTitle(
+                    ChatColor.RED + "Anulowano!",
+                    ChatColor.translateAlternateColorCodes('&', cancelMsg),
+                    0, 40, 10
+            );
             player.sendMessage(ChatColor.translateAlternateColorCodes('&', cancelMsg));
         }
+    }
+
+    private String configOrDefault(String path, String def) {
+        String val = getConfig().getString(path);
+        return val != null ? val : def;
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        // Sprawdza, czy gracz wchodzi na serwer po raz pierwszy (pierwszy login)
         if (!player.hasPlayedBefore()) {
             Location spawn = getSpawnLocation();
             if (spawn != null) {
