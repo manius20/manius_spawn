@@ -19,13 +19,16 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: 'maven' # Zmień na 'gradle' jeśli używasz Gradle
+        cache: 'gradle'
 
-    - name: Build with Maven
-      run: mvn clean package
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      run: ./gradlew build
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: S16Spawn-plugin
-        path: target/*.jar
+        path: build/libs/*.jar
