@@ -105,20 +105,27 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
             int delay = config.getInt("teleport-delay", 10);
             initialLocations.put(player.getUniqueId(), player.getLocation().clone());
 
-            // Komunikat na czacie o rozpoczęciu odliczania
             String startChatMsg = config.getString("messages.teleport-start");
             if (startChatMsg != null && !startChatMsg.isEmpty()) {
                 player.sendMessage(ChatColor.translateAlternateColorCodes('&', startChatMsg.replace("%time%", String.valueOf(delay))));
             }
 
-            BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
+            // Tworzymy tablicę obiektową na task, aby wewnętrzny Runnable miał do niej dostęp i mógł się skasować
+            final BukkitTask[] taskHolder = new BukkitTask[1];
+
+            taskHolder[0] = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
                 int timeLeft = delay;
 
                 @Override
                 public void run() {
                     if (timeLeft <= 0) {
+                        // Natychmiast kasujemy task, żeby wykonał się tylko raz
+                        if (taskHolder[0] != null) {
+                            taskHolder[0].cancel();
+                        }
                         teleportTasks.remove(player.getUniqueId());
                         initialLocations.remove(player.getUniqueId());
+                        
                         player.teleport(spawn);
 
                         String succMain = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-success-main", "&aSukces!"));
@@ -129,9 +136,6 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
                         if (succChat != null && !succChat.isEmpty()) {
                             player.sendMessage(ChatColor.translateAlternateColorCodes('&', succChat));
                         }
-
-                        BukkitTask currentTask = teleportTasks.get(player.getUniqueId());
-                        if (currentTask != null) currentTask.cancel();
                         return;
                     }
 
@@ -145,7 +149,7 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
                 }
             }, 0L, 20L);
 
-            teleportTasks.put(player.getUniqueId(), task);
+            teleportTasks.put(player.getUniqueId(), taskHolder[0]);
             return true;
         }
 
@@ -164,13 +168,15 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
 
         if (initial == null || current == null) return;
 
-        // Ignoruje obrót głowy (yaw/pitch), sprawdza fizyczne przemieszczenie (X, Y, Z)
+        // Sprawdzamy czy gracz zmienił pozycję blokową (ignorując minimalne drgnięcia i obrót głowy)
         if (initial.getBlockX() != current.getBlockX() ||
                 initial.getBlockY() != current.getBlockY() ||
                 initial.getBlockZ() != current.getBlockZ()) {
 
-            teleportTasks.get(uuid).cancel();
-            teleportTasks.remove(uuid);
+            BukkitTask task = teleportTasks.remove(uuid);
+            if (task != null) {
+                task.cancel();
+            }
             initialLocations.remove(uuid);
 
             FileConfiguration config = getConfig();
