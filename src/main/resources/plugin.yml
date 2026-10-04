@@ -1,8 +1,16 @@
-name: SpawnPlugin
+name: manius_Spawn
 version: 1.0
-main: pl.manius.spawnplugin.SpawnPlugin
-api-version: '1.21'
+main: pl.s16.spawn.Main
+api-version: '1.20'
 commands:
   spawn:
-    description: Teleportuje gracza na spawn po 10 sekundach
+    description: Teleportuje na spawn serwera.
     usage: /spawn
+  setspawn:
+    description: Ustawia punkt spawnu serwera.
+    usage: /setspawn
+    permission: s16.admin
+permissions:
+  s16.admin:
+    description: Dostęp do komend administracyjnych S16
+    default: op
