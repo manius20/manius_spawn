@@ -1,0 +1,10 @@
+messages:
+  teleport-start: "&aTeleportacja na spawn za &e%time% sekund&a. Nie ruszaj się!"
+  teleport-cancelled: "&cTeleportacja została przerwana, ponieważ się ruszyłeś!"
+  teleport-success: "&aZostałeś pomyślnie przeteleportowany na spawn!"
+  spawn-set: "&aPomyślnie ustawiono główny spawn serwera!"
+  spawn-not-set: "&cGłówny spawn serwera nie został jeszcze ustawiony!"
+  no-permission: "&cNie masz uprawnień do tej komendy."
+  only-players: "Ta komenda może być użyta tylko przez gracza."
+
+teleport-delay: 10
