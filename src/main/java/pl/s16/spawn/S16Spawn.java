@@ -105,7 +105,12 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
             int delay = config.getInt("teleport-delay", 10);
             initialLocations.put(player.getUniqueId(), player.getLocation().clone());
 
-            // Zadanie uruchamiane co sekundę, aby aktualizować tytuł na ekranie
+            // Komunikat na czacie o rozpoczęciu odliczania
+            String startChatMsg = config.getString("messages.teleport-start");
+            if (startChatMsg != null && !startChatMsg.isEmpty()) {
+                player.sendMessage(ChatColor.translateAlternateColorCodes('&', startChatMsg.replace("%time%", String.valueOf(delay))));
+            }
+
             BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
                 int timeLeft = delay;
 
@@ -115,22 +120,27 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
                         teleportTasks.remove(player.getUniqueId());
                         initialLocations.remove(player.getUniqueId());
                         player.teleport(spawn);
-                        player.sendTitle(
-                                ChatColor.GREEN + "Teleportowano!",
-                                ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-success")),
-                                0, 40, 10
-                        );
-                        player.sendMessage(ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-success")));
+
+                        String succMain = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-success-main", "&aSukces!"));
+                        String succSub = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-success-sub", "&7Przeteleportowano."));
+                        player.sendTitle(succMain, succSub, 0, 40, 10);
+
+                        String succChat = config.getString("messages.teleport-success");
+                        if (succChat != null && !succChat.isEmpty()) {
+                            player.sendMessage(ChatColor.translateAlternateColorCodes('&', succChat));
+                        }
+
                         BukkitTask currentTask = teleportTasks.get(player.getUniqueId());
                         if (currentTask != null) currentTask.cancel();
                         return;
                     }
 
-                    player.sendTitle(
-                            ChatColor.YELLOW + "Teleportacja za: " + timeLeft + "s",
-                            ChatColor.translateAlternateColorCodes('&', config.getString("messages.teleport-start").replace("%time%", String.valueOf(timeLeft))),
-                            0, 25, 0
-                    );
+                    String titleMain = ChatColor.translateAlternateColorCodes('&', 
+                            config.getString("messages.title-countdown-main", "&eTeleportacja").replace("%time%", String.valueOf(timeLeft)));
+                    String titleSub = ChatColor.translateAlternateColorCodes('&', 
+                            config.getString("messages.title-countdown-sub", "&7Za %time%s...").replace("%time%", String.valueOf(timeLeft)));
+
+                    player.sendTitle(titleMain, titleSub, 0, 25, 0);
                     timeLeft--;
                 }
             }, 0L, 20L);
@@ -154,7 +164,7 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
 
         if (initial == null || current == null) return;
 
-        // Ignoruje obrót głowy (yaw/pitch), sprawdza tylko fizyczne przemieszczenie (X, Y, Z)
+        // Ignoruje obrót głowy (yaw/pitch), sprawdza fizyczne przemieszczenie (X, Y, Z)
         if (initial.getBlockX() != current.getBlockX() ||
                 initial.getBlockY() != current.getBlockY() ||
                 initial.getBlockZ() != current.getBlockZ()) {
@@ -163,19 +173,17 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
             teleportTasks.remove(uuid);
             initialLocations.remove(uuid);
 
-            String cancelMsg = configOrDefault("messages.teleport-cancelled", "&cTeleportacja przerwana!");
-            player.sendTitle(
-                    ChatColor.RED + "Anulowano!",
-                    ChatColor.translateAlternateColorCodes('&', cancelMsg),
-                    0, 40, 10
-            );
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', cancelMsg));
-        }
-    }
+            FileConfiguration config = getConfig();
+            String cancelMain = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-cancelled-main", "&cAnulowano!"));
+            String cancelSub = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-cancelled-sub", "&cRuszyłeś się!"));
 
-    private String configOrDefault(String path, String def) {
-        String val = getConfig().getString(path);
-        return val != null ? val : def;
+            player.sendTitle(cancelMain, cancelSub, 0, 40, 10);
+
+            String cancelChat = config.getString("messages.teleport-cancelled");
+            if (cancelChat != null && !cancelChat.isEmpty()) {
+                player.sendMessage(ChatColor.translateAlternateColorCodes('&', cancelChat));
+            }
+        }
     }
 
     @EventHandler
