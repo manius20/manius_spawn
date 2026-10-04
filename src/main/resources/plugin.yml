@@ -1,0 +1,16 @@
+name: manius_Spawn
+version: 1.0
+main: pl.s16.spawn.S16Spawn
+api-version: '1.21'
+commands:
+  spawn:
+    description: Teleportuje na spawn
+    permission: s16spawn.spawn
+  setspawn:
+    description: Ustawia punkt spawnu serwera
+    permission: s16spawn.setspawn
+permissions:
+  s16spawn.spawn:
+    default: true
+  s16spawn.setspawn:
+    default: op
