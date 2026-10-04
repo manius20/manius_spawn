@@ -7,4 +7,14 @@ messages:
   no-permission: "&cNie masz uprawnień do tej komendy."
   only-players: "Ta komenda może być użyta tylko przez gracza."
 
+  # Tytuły wyświetlane na środku ekranu (Title / Subtitle)
+  title-countdown-main: "&eTeleportacja"
+  title-countdown-sub: "&7Za &c%time%s &7na spawn..."
+  
+  title-success-main: "&aSukces!"
+  title-success-sub: "&7Przeteleportowano na spawn."
+
+  title-cancelled-main: "&cCzarno to widzę!"
+  title-cancelled-sub: "&cRuszyłeś się - teleport przerwany!"
+
 teleport-delay: 10
