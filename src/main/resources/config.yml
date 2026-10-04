@@ -1,16 +1,23 @@
-# Ustawienia czasowe (w sekundach)
-teleport-delay: 5
-cooldown-time: 25
+# S16Spawn - Konfiguracja pluginu
 
-# Wiadomości tekstowe
+# Czas odliczania do teleportacji w sekundach
+teleport-delay: 10
+
+# Wiadomości wysyłane do graczy (obsługują kody kolorów z &)
 messages:
-  no-permission: "&cBrak uprawnień do tej komendy!"
-  spawn-set: "&aPomyślnie ustawiono punkt spawnu!"
-  no-spawn-set: "&cSpawn nie został jeszcze ustawiony przez administrację!"
-  cooldown-active: "&cMusisz odczekać jeszcze {time}s przed ponownym użyciem tej komendy!"
-  teleport-success: "&aPrzeteleportowano na spawn!"
-  only-players: "Ta komenda jest dostępna tylko dla graczy!"
+  teleport-start: "&b⌛ Teleportacja na spawn za {time} sekund... &cNie ruszaj się!"
+  teleport-success: "&a✔ Zostałeś pomyślnie przeteleportowany na spawn!"
+  teleport-cancelled: "&c✖ Ruszyłeś się! Teleportacja na spawn została anulowana."
+  teleport-already: "&e⚠ Już trwa Twoja teleportacja na spawn! Nie ruszaj się."
+  spawn-not-set: "&c✖ Spawn serwera nie został jeszcze ustawiony przez administrację!"
+  spawn-set-success: "&a✔ Pomyślnie ustawiono spawn S16 SMP!"
+  only-players: "Ta komenda jest dostępna tylko dla graczy."
 
-# Ustawienia napisów na środku ekranu (Title)
-title:
-  subtitle: "&eSekund do teleportacji"
+# Współrzędne spawnu (uzupełniane automatycznie przez /setspawn lub ręcznie)
+spawn:
+  world: ""
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  yaw: 0.0
+  pitch: 0.0
