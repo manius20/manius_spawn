@@ -11,6 +11,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -110,7 +111,6 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
                 player.sendMessage(ChatColor.translateAlternateColorCodes('&', startChatMsg.replace("%time%", String.valueOf(delay))));
             }
 
-            // Tworzymy tablicę obiektową na task, aby wewnętrzny Runnable miał do niej dostęp i mógł się skasować
             final BukkitTask[] taskHolder = new BukkitTask[1];
 
             taskHolder[0] = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
@@ -119,7 +119,6 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
                 @Override
                 public void run() {
                     if (timeLeft <= 0) {
-                        // Natychmiast kasujemy task, żeby wykonał się tylko raz
                         if (taskHolder[0] != null) {
                             taskHolder[0].cancel();
                         }
@@ -168,27 +167,46 @@ public final class S16Spawn extends JavaPlugin implements CommandExecutor, Liste
 
         if (initial == null || current == null) return;
 
-        // Sprawdzamy czy gracz zmienił pozycję blokową (ignorując minimalne drgnięcia i obrót głowy)
         if (initial.getBlockX() != current.getBlockX() ||
                 initial.getBlockY() != current.getBlockY() ||
                 initial.getBlockZ() != current.getBlockZ()) {
 
-            BukkitTask task = teleportTasks.remove(uuid);
-            if (task != null) {
-                task.cancel();
+            cancelTeleport(uuid, player, "messages.title-cancelled-main", "messages.title-cancelled-sub", "messages.teleport-cancelled");
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageByEntityEvent event) {
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            UUID uuid = player.getUniqueId();
+
+            if (!teleportTasks.containsKey(uuid)) return;
+
+            // Sprawdzamy, czy atakującym jest inny gracz
+            if (event.getDamager() instanceof Player) {
+                cancelTeleport(uuid, player, "messages.title-cancelled-main", "messages.title-cancelled-sub", "messages.teleport-cancelled");
+                player.sendMessage(ChatColor.RED + "Teleportacja przerwana, ponieważ zostałeś uderzony przez gracza!");
             }
-            initialLocations.remove(uuid);
+        }
+    }
 
-            FileConfiguration config = getConfig();
-            String cancelMain = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-cancelled-main", "&cAnulowano!"));
-            String cancelSub = ChatColor.translateAlternateColorCodes('&', config.getString("messages.title-cancelled-sub", "&cRuszyłeś się!"));
+    private void cancelTeleport(UUID uuid, Player player, String mainPath, String subPath, String chatPath) {
+        BukkitTask task = teleportTasks.remove(uuid);
+        if (task != null) {
+            task.cancel();
+        }
+        initialLocations.remove(uuid);
 
-            player.sendTitle(cancelMain, cancelSub, 0, 40, 10);
+        FileConfiguration config = getConfig();
+        String cancelMain = ChatColor.translateAlternateColorCodes('&', config.getString(mainPath, "&cAnulowano!"));
+        String cancelSub = ChatColor.translateAlternateColorCodes('&', config.getString(subPath, "&cTeleport przerwany!"));
 
-            String cancelChat = config.getString("messages.teleport-cancelled");
-            if (cancelChat != null && !cancelChat.isEmpty()) {
-                player.sendMessage(ChatColor.translateAlternateColorCodes('&', cancelChat));
-            }
+        player.sendTitle(cancelMain, cancelSub, 0, 40, 10);
+
+        String cancelChat = config.getString(chatPath);
+        if (cancelChat != null && !cancelChat.isEmpty()) {
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&', cancelChat));
         }
     }
 
