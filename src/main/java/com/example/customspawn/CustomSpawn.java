@@ -1,9 +1,8 @@
-package pl.manius.spawnplugin;
+package pl.s16.spawn;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -15,75 +14,112 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
-public final class SpawnPlugin extends JavaPlugin implements CommandExecutor, Listener {
+public final class Main extends JavaPlugin implements CommandExecutor, Listener {
 
-    private final HashMap<UUID, BukkitTask> teleportTasks = new HashMap<>();
-    private final HashMap<UUID, Location> startLocations = new HashMap<>();
+    private final Map<UUID, BukkitTask> activeTeleports = new HashMap<>();
+    private final Map<UUID, Location> teleportStartLocations = new HashMap<>();
 
     @Override
     public void onEnable() {
-        if (getCommand("spawn") != null) {
-            getCommand("spawn").setExecutor(this);
-        }
+        // Zapisz domyślny config jeśli nie istnieje
+        saveDefaultConfig();
+
+        // Rejestracja komend i zdarzeń
+        getCommand("spawn").setExecutor(this);
+        getCommand("setspawn").setExecutor(this);
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("Plugin SpawnPlugin (10 sekund + anty-ruch) zostal wlaczony!");
+
+        getLogger().info("S16Spawn został włączony pomyślnie!");
     }
 
     @Override
     public void onDisable() {
-        teleportTasks.clear();
-        startLocations.clear();
+        activeTeleports.clear();
+        teleportStartLocations.clear();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage("Te komende moze wykonac tylko gracz!");
-            return true;
-        }
 
-        Player player = (Player) sender;
-        UUID uuid = player.getUniqueId();
-
-        if (teleportTasks.containsKey(uuid)) {
-            player.sendMessage(ChatColor.RED + "Masz juz aktywna probe teleportacji! Nie ruszaj sie.");
-            return true;
-        }
-
-        player.sendMessage(ChatColor.YELLOW + "Teleportacja nastapi za " + ChatColor.GOLD + "10 sekund" + ChatColor.YELLOW + ". Nie ruszaj sie!");
-
-        startLocations.put(uuid, player.getLocation().clone());
-
-        final int[] secondsLeft = {10};
-
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, () -> {
-            if (secondsLeft[0] > 0) {
-                player.sendMessage(ChatColor.GRAY + "Teleportacja za: " + ChatColor.YELLOW + secondsLeft[0] + "s...");
-                secondsLeft[0]--;
-            } else {
-                World world = Bukkit.getWorld("world");
-                double x = 0.5;
-                double y = 100.0;
-                double z = 0.5;
-                float yaw = 0.0f;
-                float pitch = 0.0f;
-
-                if (world != null) {
-                    Location spawnLocation = new Location(world, x, y, z, yaw, pitch);
-                    player.teleport(spawnLocation);
-                    player.sendMessage(ChatColor.GREEN + "Zostales pomyslnie przeteleportowany na spawn!");
-                } else {
-                    player.sendMessage(ChatColor.RED + "Blad: Nie znaleziono swiata docelowego!");
-                }
-
-                cancelTeleport(uuid);
+        // Obsługa /setspawn
+        if (command.getName().equalsIgnoreCase("setspawn")) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("Ta komenda jest dostępna tylko dla graczy.");
+                return true;
             }
-        }, 0L, 20L);
 
-        teleportTasks.put(uuid, task);
-        return true;
+            Player player = (Player) sender;
+            Location loc = player.getLocation();
+
+            getConfig().set("spawn.world", loc.getWorld().getName());
+            getConfig().set("spawn.x", loc.getX());
+            getConfig().set("spawn.y", loc.getY());
+            getConfig().set("spawn.z", loc.getZ());
+            getConfig().set("spawn.yaw", loc.getYaw());
+            getConfig().set("spawn.pitch", loc.getPitch());
+            saveConfig();
+
+            player.sendMessage(ChatColor.GREEN + "✔ Pomyślnie ustawiono spawn S16 SMP!");
+            return true;
+        }
+
+        // Obsługa /spawn
+        if (command.getName().equalsIgnoreCase("spawn")) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("Ta komenda jest dostępna tylko dla graczy.");
+                return true;
+            }
+
+            Player player = (Player) sender;
+            UUID uuid = player.getUniqueId();
+
+            // Sprawdzanie czy spawn został ustawiony w configu
+            if (!getConfig().contains("spawn.world")) {
+                player.sendMessage(ChatColor.RED + "✖ Spawn serwera nie został jeszcze ustawiony przez administrację!");
+                return true;
+            }
+
+            // Jeśli gracz już ma aktywną teleportację
+            if (activeTeleports.containsKey(uuid)) {
+                player.sendMessage(ChatColor.YELLOW + "⚠ Już trwa Twoja teleportacja na spawn! Nie ruszaj się.");
+                return true;
+            }
+
+            player.sendMessage(ChatColor.AQUAMARK + "⌛ Teleportacja na spawn za 10 sekund... " + ChatColor.RED + "Nie ruszaj się!");
+            
+            // Zapisz pozycję startową gracza do weryfikacji ruchu
+            teleportStartLocations.put(uuid, player.getLocation().clone());
+
+            // Zadanie odliczające 10 sekund (200 ticków)
+            BukkitTask task = Bukkit.getScheduler().runTaskLater(this, () -> {
+                if (!player.isOnline()) return;
+
+                String worldName = getConfig().getString("spawn.world");
+                Location spawnLoc = new Location(
+                        Bukkit.getWorld(worldName),
+                        getConfig().getDouble("spawn.x"),
+                        getConfig().getDouble("spawn.y"),
+                        getConfig().getDouble("spawn.z"),
+                        (float) getConfig().getDouble("spawn.yaw"),
+                        (float) getConfig().getDouble("spawn.pitch")
+                );
+
+                player.teleport(spawnLoc);
+                player.sendMessage(ChatColor.GREEN + "✔ Zostałeś pomyślnie przeteleportowany na spawn!");
+
+                // Usunięcie z map aktywnych
+                activeTeleports.remove(uuid);
+                teleportStartLocations.remove(uuid);
+            }, 200L); // 200 ticków = 10 sekund
+
+            activeTeleports.put(uuid, task);
+            return true;
+        }
+
+        return false;
     }
 
     @EventHandler
@@ -91,27 +127,20 @@ public final class SpawnPlugin extends JavaPlugin implements CommandExecutor, Li
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
 
-        if (teleportTasks.containsKey(uuid)) {
-            Location startLoc = startLocations.get(uuid);
-            Location currentLoc = event.getTo();
+        // Jeśli gracz nie jest w trakcie teleportacji, pomijamy
+        if (!activeTeleports.containsKey(uuid)) return;
 
-            if (startLoc != null && currentLoc != null) {
-                if (startLoc.getBlockX() != currentLoc.getBlockX() ||
-                    startLoc.getBlockY() != currentLoc.getBlockY() ||
-                    startLoc.getBlockZ() != currentLoc.getBlockZ()) {
+        Location from = event.getFrom();
+        Location to = event.getTo();
 
-                    cancelTeleport(uuid);
-                    player.sendMessage(ChatColor.RED + "Ruszyles sie! Teleportacja zostala przerwana.");
-                }
-            }
+        // Sprawdzamy czy gracz faktycznie zmienił pozycję blokową (ignorujemy samo obracanie głowy/myszką)
+        if (to != null && (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ())) {
+            // Anuluj zadanie
+            activeTeleports.get(uuid).cancel();
+            activeTeleports.remove(uuid);
+            teleportStartLocations.remove(uuid);
+
+            player.sendMessage(ChatColor.RED + "✖ Ruszyłeś się! Teleportacja na spawn została anulowana.");
         }
-    }
-
-    private void cancelTeleport(UUID uuid) {
-        if (teleportTasks.containsKey(uuid)) {
-            teleportTasks.get(uuid).cancel();
-            teleportTasks.remove(uuid);
-        }
-        startLocations.remove(uuid);
     }
 }
