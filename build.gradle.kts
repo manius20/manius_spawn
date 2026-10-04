@@ -1,10 +1,9 @@
 plugins {
     java
-    id("io.papermc.paperweight.userdev") version "1.7.1"
 }
 
-group = "com.example"
-version = "1.0-SNAPSHOT"
+group = "pl.s16.spawn"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -12,13 +11,16 @@ repositories {
 }
 
 dependencies {
-    paperweight.paperDevBundle("1.21-R0.1-SNAPSHOT")
+    // Paper API na wersję 26.2 (dostosuj jeśli używasz konkretnej podwersji np. 1.21-R0.1-SNAPSHOT)
+    compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-}
-
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
